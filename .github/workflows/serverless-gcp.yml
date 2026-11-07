@@ -135,6 +135,7 @@ jobs:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4   # firebase-tools necesita firebase.json para borrar el canal
       - name: Autenticarse en GCP (OIDC + Workload Identity Federation)
         uses: google-github-actions/auth@v2
         with:
@@ -149,7 +150,8 @@ jobs:
           for fn in info questions answer certificate; do
             gcloud functions delete "${fn}${SUFFIX}" --gen2 --region "$REGION" --project "$PROJECT" --quiet &
           done
-          wait || true
+          wait
+          # Sin "|| true": si el canal no se borra, el job debe fallar y verse en rojo.
           npx --yes firebase-tools@14 hosting:channel:delete "$STAGE" --force \
-            --project "$PROJECT" --non-interactive || true
+            --project "$PROJECT" --non-interactive
           echo "### 🧹 Preview ${STAGE} eliminado" >> "$GITHUB_STEP_SUMMARY"
