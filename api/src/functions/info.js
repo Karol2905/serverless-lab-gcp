@@ -21,7 +21,7 @@ async function getPlatformInstanceId() {
       headers: { 'Metadata-Flavor': 'Google' },
       signal: AbortSignal.timeout(2000)
     });
-    if (res.ok) platformInstanceId = (await res.text()).trim();
+    if (res.ok) platformInstanceId = (await res.text()).trim().slice(0, 16); // prefijo de labels.instanceId
   } catch (err) {
     console.warn(`No se pudo leer el instance id: ${err.message}`);
   }
