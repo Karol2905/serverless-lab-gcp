@@ -142,6 +142,20 @@ const questions = [
     answer: 1,
     explanation:
       'El workflow despliega funciones propias (info-pr-<número>, …) y un canal de preview de Firebase Hosting con su URL, y la comenta en el PR. Al cerrar el PR, el job "close" borra las funciones y el canal.'
+  },
+  {
+    id: 'q11',
+    concept: 'Escalado a cero',
+    text: 'Nadie usa el sitio durante 20 minutos. ¿Qué pasa con las instancias de Cloud Run functions?',
+    options: [
+      'Siguen encendidas para siempre y se cobran por hora',
+      'La plataforma las retira (escala a cero) y la siguiente petición sufre un cold start',
+      'Se convierten en máquinas virtuales de Compute Engine',
+      'Firebase Hosting las guarda en caché con sus variables'
+    ],
+    answer: 1,
+    explanation:
+      'Con min-instances en 0, Cloud Run apaga las instancias ociosas. En el laboratorio se vio en la métrica de instancias (bajó a 0) y en coldStart: true con más de 1 s de latencia en la primera llamada.'
   }
 ];
 
