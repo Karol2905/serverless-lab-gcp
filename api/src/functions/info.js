@@ -46,6 +46,7 @@ async function info(req, res) {
     revision: process.env.K_REVISION || 'local', // cambia en cada despliegue
     stage: process.env.STAGE || 'local',
     deployVersion: (process.env.DEPLOY_VERSION || 'local').slice(0, 7),
+    labMensaje: process.env.LAB_MENSAJE || null, // reto: variable de entorno configurada fuera del código
     serverTimeMs: Date.now() - started
   });
 }

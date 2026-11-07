@@ -189,6 +189,20 @@ $('#pipeline-form').addEventListener('submit', (e) => {
     '<br><small>Nota: esta revisión corre en tu navegador, no en una función. ¿Qué diferencia hay en seguridad?</small>';
 });
 
+// ---------- Reto: función hello ----------
+$('#hello-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const name = new FormData(e.target).get('name') || '';
+  const out = $('#hello-out');
+  out.textContent = 'Llamando a /api/hello…';
+  try {
+    const r = await api(`hello?name=${encodeURIComponent(name)}`);
+    out.innerHTML = `${escapeHtml(r.saludo)} <small>(servicio ${escapeHtml(r.service)})</small>`;
+  } catch (err) {
+    out.textContent = `Error: ${err.message}`;
+  }
+});
+
 // ---------- Certificado ----------
 $('#cert-form').addEventListener('submit', async (e) => {
   e.preventDefault();
