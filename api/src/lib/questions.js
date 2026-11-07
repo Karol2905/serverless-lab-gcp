@@ -153,7 +153,7 @@ const questions = [
       'Se convierten en máquinas virtuales de Compute Engine',
       'Firebase Hosting las guarda en caché con sus variables'
     ],
-    answer: 1,
+    answer: 9,
     explanation:
       'Con min-instances en 0, Cloud Run apaga las instancias ociosas. En el laboratorio se vio en la métrica de instancias (bajó a 0) y en coldStart: true con más de 1 s de latencia en la primera llamada.'
   }
