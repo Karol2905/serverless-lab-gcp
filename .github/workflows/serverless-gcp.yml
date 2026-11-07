@@ -1,0 +1,155 @@
+# Pipeline CI/CD del laboratorio serverless (versión Google Cloud).
+# Autenticación: Workload Identity Federation (sin claves JSON de cuentas de servicio).
+#   Settings → Secrets and variables → Actions → pestaña Variables:
+#     GCP_PROJECT, GCP_REGION, GCP_WIF_PROVIDER, GCP_SERVICE_ACCOUNT  (las imprime bootstrap/bootstrap.sh)
+name: CI/CD Serverless Lab (GCP)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write       # permite pedir el token OIDC a GitHub
+  pull-requests: write  # para comentar la URL de preview en el PR
+
+env:
+  PROJECT: ${{ vars.GCP_PROJECT }}
+  REGION: ${{ vars.GCP_REGION || 'us-central1' }}
+  # main → producción (funciones info, questions…) ; PR #7 → info-pr-7, questions-pr-7…
+  SUFFIX: ${{ github.event_name == 'pull_request' && format('-pr-{0}', github.event.pull_request.number) || '' }}
+  STAGE: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || 'prod' }}
+
+concurrency:
+  group: serverless-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Pruebas de la API
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --no-audit --no-fund
+      - run: npm test
+
+  deploy:
+    name: Desplegar en Google Cloud
+    needs: test
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Autenticarse en GCP (OIDC + Workload Identity Federation)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Desplegar las 4 Cloud Run functions (${{ env.STAGE }})
+        run: |
+          SHA="${{ github.event.pull_request.head.sha || github.sha }}"
+          for fn in info questions answer certificate; do
+            gcloud functions deploy "${fn}${SUFFIX}" --gen2 --quiet \
+              --project "$PROJECT" --region "$REGION" \
+              --runtime nodejs22 --source api --entry-point "$fn" \
+              --trigger-http --allow-unauthenticated \
+              --memory 256Mi --timeout 10s --max-instances 10 \
+              --run-service-account "fn-runtime@${PROJECT}.iam.gserviceaccount.com" \
+              --build-service-account "projects/${PROJECT}/serviceAccounts/fn-build@${PROJECT}.iam.gserviceaccount.com" \
+              --update-labels "lab=serverless,stage=${STAGE}" \
+              --set-env-vars "STAGE=${STAGE},DEPLOY_VERSION=${SHA}" > "deploy-${fn}.log" 2>&1 &
+            pids+=($!)
+          done
+          fail=0
+          for i in "${!pids[@]}"; do wait "${pids[$i]}" || fail=1; done
+          for fn in info questions answer certificate; do echo "::group::${fn}${SUFFIX}"; cat "deploy-${fn}.log"; echo "::endgroup::"; done
+          exit $fail
+
+      - name: Apuntar los rewrites de Hosting a las funciones de este entorno
+        run: |
+          jq --arg s "$SUFFIX" --arg r "$REGION" \
+            '.hosting.rewrites |= map(.run.serviceId += $s | .run.region = $r)' firebase.json > fb.json
+          mv fb.json firebase.json
+          jq '.hosting.rewrites' firebase.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Publicar sitio en Firebase Hosting
+        id: hosting
+        run: |
+          if [ "$STAGE" = "prod" ]; then
+            npx --yes firebase-tools@14 deploy --only hosting --project "$PROJECT" \
+              --non-interactive -m "commit ${GITHUB_SHA::7}"
+            URL="https://${PROJECT}.web.app"
+          else
+            npx --yes firebase-tools@14 hosting:channel:deploy "$STAGE" --expires 7d \
+              --project "$PROJECT" --non-interactive --json > channel.json
+            cat channel.json
+            URL=$(jq -r '.result | to_entries[0].value.url' channel.json)
+          fi
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "### 🚀 ${STAGE}: $URL" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Prueba de humo
+        run: |
+          curl -fsS --retry 6 --retry-all-errors --retry-delay 5 "${{ steps.hosting.outputs.url }}/api/info"
+          echo
+
+      - name: Comentar la URL de preview en el PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const marker = '<!-- serverless-preview -->';
+            const body = `${marker}\n🔎 **Entorno de preview listo** (\`${process.env.STAGE}\`)\n\n` +
+              `Sitio: ${{ steps.hosting.outputs.url }}\n\n` +
+              `Funciones: \`info${process.env.SUFFIX}\`, \`questions${process.env.SUFFIX}\`, ` +
+              `\`answer${process.env.SUFFIX}\`, \`certificate${process.env.SUFFIX}\`\n\n` +
+              `Commit: \`${context.payload.pull_request.head.sha.slice(0, 7)}\``;
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number });
+            const old = comments.find((c) => c.body.includes(marker));
+            if (old) await github.rest.issues.updateComment({ owner, repo, comment_id: old.id, body });
+            else await github.rest.issues.createComment({ owner, repo, issue_number, body });
+
+  close_preview:
+    name: Cerrar entorno de preview
+    if: github.event_name == 'pull_request' && github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Autenticarse en GCP (OIDC + Workload Identity Federation)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Borrar funciones y canal de preview (${{ env.STAGE }})
+        run: |
+          for fn in info questions answer certificate; do
+            gcloud functions delete "${fn}${SUFFIX}" --gen2 --region "$REGION" --project "$PROJECT" --quiet &
+          done
+          wait || true
+          npx --yes firebase-tools@14 hosting:channel:delete "$STAGE" --force \
+            --project "$PROJECT" --non-interactive || true
+          echo "### 🧹 Preview ${STAGE} eliminado" >> "$GITHUB_STEP_SUMMARY"

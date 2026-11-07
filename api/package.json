@@ -1,0 +1,17 @@
+{
+  "name": "serverless-lab-api",
+  "version": "1.0.0",
+  "description": "API serverless del laboratorio (Cloud Run functions, Node.js 22)",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "test": "node --test",
+    "start": "functions-framework --target=info --port=8081"
+  },
+  "dependencies": {
+    "@google-cloud/functions-framework": "^3.4.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "hosting": {
+    "public": "src",
+    "ignore": ["firebase.json", "**/.*"],
+    "rewrites": [
+      { "source": "/api/info",        "run": { "serviceId": "info",        "region": "us-central1" } },
+      { "source": "/api/questions",   "run": { "serviceId": "questions",   "region": "us-central1" } },
+      { "source": "/api/answer",      "run": { "serviceId": "answer",      "region": "us-central1" } },
+      { "source": "/api/certificate", "run": { "serviceId": "certificate", "region": "us-central1" } }
+    ],
+    "headers": [
+      {
+        "source": "**",
+        "headers": [
+          { "key": "X-Content-Type-Options", "value": "nosniff" },
+          { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
+        ]
+      },
+      {
+        "source": "**/*.@(html|js|css)",
+        "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+      }
+    ]
+  }
+}
