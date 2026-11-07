@@ -14,17 +14,18 @@ let invocations = 0;
 // de Cloud Logging). Se pide al servidor de metadatos solo una vez por instancia.
 let platformInstanceId = null;
 async function getPlatformInstanceId() {
-  if (platformInstanceId !== null || !process.env.K_SERVICE) return platformInstanceId || 'local';
+  if (platformInstanceId) return platformInstanceId;
+  if (!process.env.K_SERVICE) return 'local';
   try {
     const res = await fetch('http://metadata.google.internal/computeMetadata/v1/instance/id', {
       headers: { 'Metadata-Flavor': 'Google' },
-      signal: AbortSignal.timeout(500)
+      signal: AbortSignal.timeout(2000)
     });
-    platformInstanceId = res.ok ? (await res.text()).slice(-12) : 'desconocido';
-  } catch {
-    platformInstanceId = 'desconocido';
+    if (res.ok) platformInstanceId = (await res.text()).trim();
+  } catch (err) {
+    console.warn(`No se pudo leer el instance id: ${err.message}`);
   }
-  return platformInstanceId;
+  return platformInstanceId || 'desconocido';
 }
 
 async function info(req, res) {

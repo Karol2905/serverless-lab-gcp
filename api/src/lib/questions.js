@@ -57,7 +57,7 @@ const questions = [
     ],
     answer: 1,
     explanation:
-      'Si no hay una instancia "caliente", Cloud Run debe arrancar un contenedor nuevo, cargar el runtime, cargar el runtime y tu código. Esa primera invocación tarda más. En la pestaña "Laboratorio en vivo" puedes verlo con el campo coldStart.'
+      'Si no hay una instancia "caliente", Cloud Run debe arrancar un contenedor nuevo, cargar el runtime y tu código. Esa primera invocación tarda más. En la pestaña "Laboratorio en vivo" puedes verlo con el campo coldStart.'
   },
   {
     id: 'q5',
