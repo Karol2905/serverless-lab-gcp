@@ -53,3 +53,11 @@ test('certificate: emite código solo si aprueba', async () => {
   res = fakeRes(); await certificate(req('POST', { name: 'A' }), res);
   assert.equal(res.statusCode, 400);
 });
+
+test('hello: saluda con el nombre limpio o a un visitante', async () => {
+  const { hello } = require('../src/functions/hello');
+  let res = fakeRes(); await hello({ method: 'GET', query: { name: '<b>Ana</b>' }, get: () => undefined }, res);
+  assert.match(res.body.saludo, /Hola, bAna\/b!/);
+  res = fakeRes(); await hello({ method: 'GET', query: {}, get: () => undefined }, res);
+  assert.equal(res.body.name, 'visitante');
+});

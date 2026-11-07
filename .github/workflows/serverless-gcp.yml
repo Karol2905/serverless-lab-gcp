@@ -60,10 +60,14 @@ jobs:
 
       - uses: google-github-actions/setup-gcloud@v2
 
-      - name: Desplegar las 4 Cloud Run functions (${{ env.STAGE }})
+      - name: Desplegar las Cloud Run functions (${{ env.STAGE }})
+        env:
+          LAB_MENSAJE: ${{ vars.LAB_MENSAJE }}   # variable del repositorio, fuera del código
         run: |
           SHA="${{ github.event.pull_request.head.sha || github.sha }}"
-          for fn in info questions answer certificate; do
+          # ^|^ cambia el separador de --set-env-vars para que LAB_MENSAJE pueda llevar comas.
+          ENV_VARS="^|^STAGE=${STAGE}|DEPLOY_VERSION=${SHA}|LAB_MENSAJE=${LAB_MENSAJE}"
+          for fn in info questions answer certificate hello; do
             gcloud functions deploy "${fn}${SUFFIX}" --gen2 --quiet \
               --project "$PROJECT" --region "$REGION" \
               --runtime nodejs22 --source api --entry-point "$fn" \
@@ -72,12 +76,12 @@ jobs:
               --run-service-account "fn-runtime@${PROJECT}.iam.gserviceaccount.com" \
               --build-service-account "projects/${PROJECT}/serviceAccounts/fn-build@${PROJECT}.iam.gserviceaccount.com" \
               --update-labels "lab=serverless,stage=${STAGE}" \
-              --set-env-vars "STAGE=${STAGE},DEPLOY_VERSION=${SHA}" > "deploy-${fn}.log" 2>&1 &
+              --set-env-vars "$ENV_VARS" > "deploy-${fn}.log" 2>&1 &
             pids+=($!)
           done
           fail=0
           for i in "${!pids[@]}"; do wait "${pids[$i]}" || fail=1; done
-          for fn in info questions answer certificate; do echo "::group::${fn}${SUFFIX}"; cat "deploy-${fn}.log"; echo "::endgroup::"; done
+          for fn in info questions answer certificate hello; do echo "::group::${fn}${SUFFIX}"; cat "deploy-${fn}.log"; echo "::endgroup::"; done
           exit $fail
 
       - name: Apuntar los rewrites de Hosting a las funciones de este entorno
@@ -121,7 +125,7 @@ jobs:
             const body = `${marker}\n🔎 **Entorno de preview listo** (\`${process.env.STAGE}\`)\n\n` +
               `Sitio: ${{ steps.hosting.outputs.url }}\n\n` +
               `Funciones: \`info${process.env.SUFFIX}\`, \`questions${process.env.SUFFIX}\`, ` +
-              `\`answer${process.env.SUFFIX}\`, \`certificate${process.env.SUFFIX}\`\n\n` +
+              `\`answer${process.env.SUFFIX}\`, \`certificate${process.env.SUFFIX}\`, \`hello${process.env.SUFFIX}\`\n\n` +
               `Commit: \`${context.payload.pull_request.head.sha.slice(0, 7)}\``;
             const { owner, repo } = context.repo;
             const issue_number = context.issue.number;
@@ -147,7 +151,7 @@ jobs:
           node-version: 22
       - name: Borrar funciones y canal de preview (${{ env.STAGE }})
         run: |
-          for fn in info questions answer certificate; do
+          for fn in info questions answer certificate hello; do
             gcloud functions delete "${fn}${SUFFIX}" --gen2 --region "$REGION" --project "$PROJECT" --quiet &
           done
           wait

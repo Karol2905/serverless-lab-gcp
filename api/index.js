@@ -7,8 +7,10 @@ const { info } = require('./src/functions/info');
 const { questions } = require('./src/functions/questions');
 const { answer } = require('./src/functions/answer');
 const { certificate } = require('./src/functions/certificate');
+const { hello } = require('./src/functions/hello');
 
 functions.http('info', info);
 functions.http('questions', questions);
 functions.http('answer', answer);
 functions.http('certificate', certificate);
+functions.http('hello', hello);

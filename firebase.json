@@ -6,7 +6,8 @@
       { "source": "/api/info",        "run": { "serviceId": "info",        "region": "us-central1" } },
       { "source": "/api/questions",   "run": { "serviceId": "questions",   "region": "us-central1" } },
       { "source": "/api/answer",      "run": { "serviceId": "answer",      "region": "us-central1" } },
-      { "source": "/api/certificate", "run": { "serviceId": "certificate", "region": "us-central1" } }
+      { "source": "/api/certificate", "run": { "serviceId": "certificate", "region": "us-central1" } },
+      { "source": "/api/hello",       "run": { "serviceId": "hello",       "region": "us-central1" } }
     ],
     "headers": [
       {
